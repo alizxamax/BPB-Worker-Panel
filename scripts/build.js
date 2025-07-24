@@ -73,7 +73,7 @@ async function buildWorker() {
     console.log('✅ Worker built successfuly!');
 
     let finalCode;
-    if (True) {
+    if (1 == 1) {
         finalCode = code.outputFiles[0].text;
     } else {
         const minifiedCode = await jsMinify(code.outputFiles[0].text, {
