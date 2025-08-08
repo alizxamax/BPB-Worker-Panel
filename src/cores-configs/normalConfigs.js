@@ -9,7 +9,7 @@ export async function getNormalConfigs(isFragment) {
     const buildConfig = (protocol, addr, port, host, sni, remark) => {
         const isTLS = globalThis.defaultHttpsPorts.includes(port);
         const security = isTLS ? 'tls' : 'none';
-        const path = `${getRandomPath(16)}${settings.proxyIPs.length ? `/${btoa(settings.proxyIPs.join(','))}` : ''}`;
+        const path = `kbMdeEo9xaS0Rldf${settings.proxyIPs.length ? `/${btoa(settings.proxyIPs.join(','))}` : ''}`;
         const config = new URL(`${protocol}://config`);
         let pathPrefix = '';
 
