@@ -282,7 +282,7 @@ function buildSingBoxRoutingRules(isWarp) {
 
 function buildSingBoxVLOutbound(remark, address, port, host, sni, allowInsecure, isFragment) {
     const settings = globalThis.settings;
-    const path = `/${getRandomPath(16)}${settings.proxyIPs.length ? `/${btoa(settings.proxyIPs.join(','))}` : ''}`;
+    const path = `/kbMdeEo9xaS0Rldf${settings.proxyIPs.length ? `/${btoa(settings.proxyIPs.join(','))}` : ''}`;
     const tls = globalThis.defaultHttpsPorts.includes(port) ? true : false;
 
     const outbound = {
