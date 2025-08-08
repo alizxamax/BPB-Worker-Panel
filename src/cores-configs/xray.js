@@ -201,7 +201,7 @@ function buildXrayRoutingRules(isChain, isBalancer, isWorkerLess, isWarp) {
 function buildXrayVLOutbound(tag, address, port, host, sni, proxyIPs, isFragment, allowInsecure) {
     const settings = globalThis.settings;
     const proxyIpPath = proxyIPs.length ? `/${btoa(proxyIPs.join(','))}` : '';
-    const path = `/${getRandomPath(16)}${proxyIpPath}?ed=2560`;
+    const path = `/kbMdeEo9xaS0Rldf${proxyIpPath}?ed=2560`;
     const outbound = {
         protocol: atob('dmxlc3M='),
         settings: {
