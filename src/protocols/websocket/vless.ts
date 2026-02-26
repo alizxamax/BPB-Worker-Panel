@@ -2,14 +2,19 @@ import { isValidUUID } from '@common';
 import {
     safeCloseTcpSocket,
     handleTCPOutBound,
-    makeReadableWebSocketStream,
     WS_READY_STATE_OPEN
 } from './common';
 
+// نام تابع تغییر نکرده تا فایل‌های روتر پروژه شما ارور ندهند، اما عملکرد آن به XHTTP Stream-Up تغییر یافته است.
 export async function VlOverWSHandler(request: Request): Promise<Response> {
-    const webSocketPair = new WebSocketPair();
-    const [client, webSocket] = Object.values(webSocketPair);
-    webSocket.accept();
+    // در XHTTP اطلاعات معمولا با متدهای POST یا PUT آپلود می‌شوند (Stream-Up)
+    if (!["POST", "PUT", "GET"].includes(request.method.toUpperCase())) {
+        return new Response("Method Not Allowed", { status: 405 });
+    }
+
+    if (!request.body) {
+        return new Response("Bad Request: stream up requires a request body", { status: 400 });
+    }
 
     let address = "";
     let portWithRandomLog = "";
@@ -18,13 +23,34 @@ export async function VlOverWSHandler(request: Request): Promise<Response> {
         console.log(`[${address}:${portWithRandomLog}] ${info}`, event || "");
     };
 
-    const earlyDataHeader = request.headers.get("sec-websocket-protocol") || "";
-    const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log);
+    // ایجاد یک استریم برای پاسخ به کلاینت (ارسال اطلاعات از اینترنت به گوشی کاربر)
+    const { readable: responseReadable, writable: responseWritable } = new TransformStream();
+    const responseWriter = responseWritable.getWriter();
+    let isClosed = false;
+
+    // ساخت یک شیء وب‌سوکت مجازی برای سازگاری با توابع قدیمی شما (handleTCPOutBound و غیره)
+    const fakeWebSocket = {
+        readyState: WS_READY_STATE_OPEN || 1,
+        send: (data: any) => {
+            if (isClosed) return;
+            responseWriter.write(data).catch(() => {
+                isClosed = true;
+            });
+        },
+        close: () => {
+            if (isClosed) return;
+            isClosed = true;
+            try {
+                responseWriter.close();
+            } catch (error) {}
+        }
+    } as unknown as WebSocket;
 
     let remoteSocketWapper: { value: Socket | null } = { value: null };
     let udpStreamWrite: any = null;
     let isDns = false;
 
+    // استریم پردازش اطلاعات ارسالی از سمت کاربر
     const writableStream = new WritableStream({
         async write(chunk) {
             if (isDns && udpStreamWrite) {
@@ -62,7 +88,8 @@ export async function VlOverWSHandler(request: Request): Promise<Response> {
             if (isUDP) {
                 if (portRemote === 53) {
                     isDns = true;
-                    const { write } = await handleUDPOutBound(webSocket, VLResponseHeader, log);
+                    // توابع شما انتظار وب سوکت دارند، ما وب سوکت مجازی خودمان را به آنها پاس می‌دهیم
+                    const { write } = await handleUDPOutBound(fakeWebSocket, VLResponseHeader, log);
                     udpStreamWrite = write;
                     udpStreamWrite(rawClientData);
                     return;
@@ -76,29 +103,35 @@ export async function VlOverWSHandler(request: Request): Promise<Response> {
                 addressRemote,
                 portRemote,
                 rawClientData,
-                webSocket,
+                fakeWebSocket,
                 VLResponseHeader,
                 log
             );
         },
         close() {
             safeCloseTcpSocket(remoteSocketWapper.value);
+            fakeWebSocket.close();
         },
         abort(reason) {
-            log(`readableWebSocketStream is abort`, JSON.stringify(reason));
+            log(`request body stream is abort`, JSON.stringify(reason));
+            safeCloseTcpSocket(remoteSocketWapper.value);
+            fakeWebSocket.close();
         },
     });
 
-    readableWebSocketStream
-        .pipeTo(writableStream)
-        .catch(error => {
-            log("readableWebSocketStream pipeTo error", error);
-            safeCloseTcpSocket(remoteSocketWapper.value);
-        });
+    // متصل کردن جریان داده‌ی XHTTP (درخواست کاربر) به منطق پردازشگر بالا
+    request.body.pipeTo(writableStream).catch(error => {
+        log("request.body pipeTo error", error);
+        safeCloseTcpSocket(remoteSocketWapper.value);
+        fakeWebSocket.close();
+    });
 
-    return new Response(null, {
-        status: 101,
-        webSocket: client,
+    // بازگرداندن وضعیت 200 HTTP استاندارد به همراه جریان داده به عنوان پاسخ (Stream)
+    return new Response(responseReadable, {
+        status: 200,
+        headers: {
+            "Content-Type": "application/octet-stream"
+        },
     });
 }
 
@@ -162,7 +195,7 @@ function parseVlHeader(VLBuffer: ArrayBuffer, userID: string) {
         case 3: {
             addressLength = 16;
             const dataView = new DataView(VLBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
-            const ipv6 = [];
+            const ipv6 =[];
 
             for (let i = 0; i < 8; i++) {
                 ipv6.push(dataView.getUint16(i * 2).toString(16));
@@ -197,7 +230,7 @@ function parseVlHeader(VLBuffer: ArrayBuffer, userID: string) {
 }
 
 function unsafeStringify(arr: Uint8Array, offset = 0) {
-    const byteToHex: string[] = [];
+    const byteToHex: string[] =[];
 
     for (let i = 0; i < 256; ++i) {
         byteToHex.push((i + 256).toString(16).slice(1));
